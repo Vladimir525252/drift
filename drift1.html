@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>3D Drift Simulator</title>
+<style>
+    body { margin: 0; overflow: hidden; background: #000; }
+    #info {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        color: white;
+        font-family: Arial;
+    }
+</style>
+</head>
+<body>
+
+<div id="info">
+    Управление:<br>
+    W — газ<br>
+    S — тормоз<br>
+    A/D — поворот<br>
+    SPACE — дрифт
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.158/build/three.min.js"></script>
+
+<script>
+let scene, camera, renderer;
+let car, velocity = 0, direction = 0;
+let driftFactor = 0.95;
+let isDrifting = false;
+
+const keys = {};
+
+init();
+animate();
+
+function init() {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x202020);
+
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 5, 10);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Свет
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(10, 10, 5);
+    scene.add(light);
+
+    // Земля
+    const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(200, 200),
+        new THREE.MeshStandardMaterial({ color: 0x333333 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    scene.add(ground);
+
+    // Машина (простой бокс)
+    const carGeometry = new THREE.BoxGeometry(2, 0.5, 4);
+    const carMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+    car = new THREE.Mesh(carGeometry, carMaterial);
+    car.position.y = 0.25;
+    scene.add(car);
+
+    // События
+    window.addEventListener('keydown', e => keys[e.code] = true);
+    window.addEventListener('keyup', e => keys[e.code] = false);
+}
+
+function updatePhysics() {
+    // Газ / тормоз
+    if (keys['KeyW']) velocity += 0.02;
+    if (keys['KeyS']) velocity -= 0.03;
+
+    velocity *= 0.98; // трение
+
+    // Поворот
+    if (keys['KeyA']) direction += 0.03;
+    if (keys['KeyD']) direction -= 0.03;
+
+    // Дрифт
+    isDrifting = keys['Space'];
+
+    let drift = isDrifting ? driftFactor : 1;
+
+    car.rotation.y += direction * velocity * 0.5;
+
+    car.position.x += Math.sin(car.rotation.y) * velocity * drift;
+    car.position.z += Math.cos(car.rotation.y) * velocity * drift;
+
+    // Камера следует за машиной
+    camera.position.x = car.position.x - Math.sin(car.rotation.y) * 10;
+    camera.position.z = car.position.z - Math.cos(car.rotation.y) * 10;
+    camera.lookAt(car.position);
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    updatePhysics();
+    renderer.render(scene, camera);
+}
+</script>
+
+</body>
+</html>

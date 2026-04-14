@@ -34,7 +34,7 @@ light.position.set(5,10,7);
 scene.add(light);
 
 // Земля
-let groundGeo = new THREE.PlaneGeometry(200, 200);
+let groundGeo = new THREE.PlaneGeometry(2000, 2000);
 let groundMat = new THREE.MeshPhongMaterial({ color: 0x444444 });
 let ground = new THREE.Mesh(groundGeo, groundMat);
 ground.rotation.x = -Math.PI/2;
