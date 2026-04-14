@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>3D Tanks</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: black; }
+    </style>
+</head>
+<body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+let scene = new THREE.Scene();
+let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+
+let renderer = new THREE.WebGLRenderer();
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// свет
+let light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(10, 20, 10);
+scene.add(light);
+
+// земля
+let ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(100, 100),
+    new THREE.MeshPhongMaterial({ color: 0x2e8b57 })
+);
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+// === ТАНК ИГРОКА ===
+let tank = new THREE.Group();
+
+let body = new THREE.Mesh(
+    new THREE.BoxGeometry(2, 1, 3),
+    new THREE.MeshPhongMaterial({ color: 0x555555 })
+);
+tank.add(body);
+
+let turret = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.5, 0.5, 0.5, 16),
+    new THREE.MeshPhongMaterial({ color: 0x777777 })
+);
+turret.position.y = 0.75;
+tank.add(turret);
+
+let gun = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.1, 0.1, 2, 16),
+    new THREE.MeshPhongMaterial({ color: 0x999999 })
+);
+gun.rotation.z = Math.PI / 2;
+gun.position.set(1, 0.75, 0);
+tank.add(gun);
+
+scene.add(tank);
+
+// === ВРАГИ ===
+let enemies = [];
+
+function createEnemy(x, z) {
+    let enemy = new THREE.Mesh(
+        new THREE.BoxGeometry(2, 1, 3),
+        new THREE.MeshPhongMaterial({ color: 0xff0000 })
+    );
+    enemy.position.set(x, 0.5, z);
+    enemy.health = 3;
+    scene.add(enemy);
+    enemies.push(enemy);
+}
+
+createEnemy(10, 10);
+createEnemy(-10, -5);
+
+// === ПРЕПЯТСТВИЯ ===
+let obstacles = [];
+
+function createObstacle(x, z) {
+    let box = new THREE.Mesh(
+        new THREE.BoxGeometry(2, 2, 2),
+        new THREE.MeshPhongMaterial({ color: 0x8b4513 })
+    );
+    box.position.set(x, 1, z);
+    scene.add(box);
+    obstacles.push(box);
+}
+
+createObstacle(5, 5);
+createObstacle(-5, -5);
+createObstacle(0, 10);
+
+// === СНАРЯДЫ ===
+let bullets = [];
+
+function shoot() {
+    let bullet = new THREE.Mesh(
+        new THREE.SphereGeometry(0.2, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0xffff00 })
+    );
+
+    bullet.position.copy(tank.position);
+    bullet.position.y = 0.5;
+
+    let dir = new THREE.Vector3(1, 0, 0);
+    dir.applyQuaternion(tank.quaternion);
+
+    bullet.velocity = dir.multiplyScalar(0.5);
+
+    scene.add(bullet);
+    bullets.push(bullet);
+}
+
+// === УПРАВЛЕНИЕ ===
+let keys = {};
+
+document.addEventListener("keydown", e => {
+    keys[e.key] = true;
+    if (e.key === " ") shoot();
+});
+document.addEventListener("keyup", e => keys[e.key] = false);
+
+// === КОЛЛИЗИИ ===
+function checkCollision(a, b) {
+    let dist = a.position.distanceTo(b.position);
+    return dist < 1.5;
+}
+
+// === ИИ ВРАГОВ ===
+function updateEnemies() {
+    enemies.forEach(enemy => {
+        let dir = new THREE.Vector3().subVectors(tank.position, enemy.position).normalize();
+        enemy.position.add(dir.multiplyScalar(0.02));
+    });
+}
+
+// === ОБНОВЛЕНИЕ СНАРЯДОВ ===
+function updateBullets() {
+    bullets.forEach((b, i) => {
+        b.position.add(b.velocity);
+
+        // столкновение с врагами
+        enemies.forEach((enemy, ei) => {
+            if (checkCollision(b, enemy)) {
+                enemy.health -= 1;
+                scene.remove(b);
+                bullets.splice(i, 1);
+
+                if (enemy.health <= 0) {
+                    scene.remove(enemy);
+                    enemies.splice(ei, 1);
+                }
+            }
+        });
+
+        // столкновение с препятствиями
+        obstacles.forEach(obs => {
+            if (checkCollision(b, obs)) {
+                scene.remove(b);
+                bullets.splice(i, 1);
+            }
+        });
+    });
+}
+
+// === ДВИЖЕНИЕ С КОЛЛИЗИЯМИ ===
+function moveTank() {
+    let prev = tank.position.clone();
+
+    if (keys["w"]) tank.translateZ(-0.1);
+    if (keys["s"]) tank.translateZ(0.1);
+    if (keys["a"]) tank.rotation.y += 0.05;
+    if (keys["d"]) tank.rotation.y -= 0.05;
+
+    // проверка столкновений с препятствиями
+    obstacles.forEach(obs => {
+        if (checkCollision(tank, obs)) {
+            tank.position.copy(prev);
+        }
+    });
+}
+
+// === КАМЕРА ===
+function updateCamera() {
+    let offset = new THREE.Vector3(0, 5, 8);
+    offset.applyQuaternion(tank.quaternion);
+
+    camera.position.copy(tank.position.clone().add(offset));
+    camera.lookAt(tank.position);
+}
+
+// === ЦИКЛ ===
+function animate() {
+    requestAnimationFrame(animate);
+
+    moveTank();
+    updateEnemies();
+    updateBullets();
+    updateCamera();
+
+    renderer.render(scene, camera);
+}
+
+animate();
+</script>
+</body>
+</html>

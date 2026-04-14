@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>3D Drift Simulator</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #000; }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-family: Arial;
+    }
+  </style>
+</head>
+<body>
+<div id="info">W/S - газ/тормоз | A/D - поворот</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+let scene = new THREE.Scene();
+scene.background = new THREE.Color(0x222222);
+
+let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+let renderer = new THREE.WebGLRenderer();
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Свет
+let light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(5,10,7);
+scene.add(light);
+
+// Земля
+let groundGeo = new THREE.PlaneGeometry(200, 200);
+let groundMat = new THREE.MeshPhongMaterial({ color: 0x444444 });
+let ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI/2;
+scene.add(ground);
+
+// Машина
+let car = new THREE.Mesh(
+  new THREE.BoxGeometry(2, 0.5, 4),
+  new THREE.MeshPhongMaterial({ color: 0xff0000 })
+);
+car.position.y = 0.25;
+scene.add(car);
+
+// Физика
+let velocity = new THREE.Vector3(0,0,0);
+let direction = 0;
+let speed = 0;
+
+let keys = {};
+
+document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+
+function updatePhysics() {
+  let accel = 0.02;
+  let turnSpeed = 0.03;
+  let friction = 0.98;
+  let driftFactor = 0.92;
+
+  if (keys["w"]) speed += accel;
+  if (keys["s"]) speed -= accel;
+
+  if (keys["a"]) direction += turnSpeed * speed * 2;
+  if (keys["d"]) direction -= turnSpeed * speed * 2;
+
+  // Дрифт (скольжение)
+  velocity.x += Math.sin(direction) * speed;
+  velocity.z += Math.cos(direction) * speed;
+
+  velocity.multiplyScalar(driftFactor);
+
+  car.position.add(velocity);
+
+  speed *= friction;
+
+  car.rotation.y = direction;
+}
+
+// Камера следует за машиной
+function updateCamera() {
+  let offset = new THREE.Vector3(
+    Math.sin(direction) * -10,
+    5,
+    Math.cos(direction) * -10
+  );
+  camera.position.copy(car.position).add(offset);
+  camera.lookAt(car.position);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  updatePhysics();
+  updateCamera();
+
+  renderer.render(scene, camera);
+}
+
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+
+</body>
+</html>
